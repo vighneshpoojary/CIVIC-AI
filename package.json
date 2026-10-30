@@ -1,0 +1,14 @@
+{
+  "name": "civicai-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CivicAI – Smarter Cities. Stronger Communities. AI for Civic Impact (PromptWars x ASTRA)",
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "start": "cd frontend && npm run dev",
+    "test": "cd backend && python test_full_suite.py"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
