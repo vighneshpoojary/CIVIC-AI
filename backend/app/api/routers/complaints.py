@@ -1,3 +1,4 @@
+import html
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional, Dict, Any
 from app.services.complaint_service import complaint_service
@@ -25,10 +26,18 @@ def list_complaints(
 @router.post("", status_code=201)
 async def create_complaint(complaint_in: ComplaintCreate):
     """
-    Submits a new civic complaint. Automatically triggers AI assessment
-    for categorization, summarization, and explainable priority scoring.
+    Submits a new civic complaint with OWASP XSS input sanitization.
+    Automatically triggers AI assessment for categorization and explainable priority scoring.
     """
     data = complaint_in.model_dump()
+    # Sanitize user string inputs against stored XSS
+    data["title"] = html.escape(data.get("title", "").strip())
+    data["description"] = html.escape(data.get("description", "").strip())
+    if "address" in data and isinstance(data["address"], str):
+        data["address"] = html.escape(data["address"].strip())
+    if "ward" in data and isinstance(data["ward"], str):
+        data["ward"] = html.escape(data["ward"].strip())
+
     new_record = complaint_service.create(data)
     
     # Trigger AI analysis asynchronously / immediately
@@ -43,7 +52,8 @@ async def create_complaint(complaint_in: ComplaintCreate):
         new_record["priority"] = assessment.priority_recommendation
         new_record["suggested_department"] = assessment.suggested_department
     except Exception as e:
-        print(f"Notice: AI assessment fallback used: {e}")
+        import logging
+        logging.getLogger(__name__).warning(f"AI assessment fallback used: {e}")
         
     return new_record
 

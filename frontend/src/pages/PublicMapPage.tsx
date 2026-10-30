@@ -53,9 +53,10 @@ export const PublicMapPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Category Dropdown */}
           <select
+            aria-label="Filter civic complaints by category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 outline-none"
+            className="text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 outline-none focus:ring-1 focus:ring-[#087F8C]"
           >
             {categories.map((c) => (
               <option key={c} value={c}>Category: {c}</option>
@@ -64,9 +65,10 @@ export const PublicMapPage: React.FC = () => {
 
           {/* Status Dropdown */}
           <select
+            aria-label="Filter civic complaints by status"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 outline-none"
+            className="text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 outline-none focus:ring-1 focus:ring-[#087F8C]"
           >
             {statuses.map((s) => (
               <option key={s} value={s}>Status: {s}</option>
@@ -75,14 +77,16 @@ export const PublicMapPage: React.FC = () => {
 
           {/* Hotspot Toggle */}
           <button
+            aria-label="Toggle spatial hotspot rings overlay on map"
+            aria-pressed={showHotspots}
             onClick={() => setShowHotspots(!showHotspots)}
-            className={`inline-flex items-center text-xs font-semibold px-3 py-2 rounded-lg border transition-colors ${
+            className={`inline-flex items-center text-xs font-semibold px-3 py-2 rounded-lg border transition-colors focus:ring-2 focus:ring-[#087F8C] ${
               showHotspots
                 ? 'bg-amber-50 text-amber-800 border-amber-300'
                 : 'bg-slate-50 text-slate-500 border-slate-200'
             }`}
           >
-            <Flame className="w-3.5 h-3.5 mr-1 text-amber-600" />
+            <Flame className="w-3.5 h-3.5 mr-1 text-amber-600" aria-hidden="true" />
             Hotspot Rings: {showHotspots ? 'ON' : 'OFF'}
           </button>
         </div>

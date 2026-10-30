@@ -1,23 +1,71 @@
 import os
 import uuid
 import json
+import logging
 import urllib.request
 import pandas as pd
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
+from collections import defaultdict, Counter
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 class ComplaintService:
     def __init__(self):
         self.complaints_db: Dict[str, Dict[str, Any]] = {}
         self.status_history_db: Dict[str, List[Dict[str, Any]]] = {}
+        
+        # Inverted index data structures for O(1) filtering
+        self._category_idx: Dict[str, Set[str]] = defaultdict(set)
+        self._priority_idx: Dict[str, Set[str]] = defaultdict(set)
+        self._status_idx: Dict[str, Set[str]] = defaultdict(set)
+        self._ward_idx: Dict[str, Set[str]] = defaultdict(set)
+        self._ref_id_idx: Dict[str, str] = {}
+        
+        # In-memory analytics cache
+        self._analytics_cache: Optional[Dict[str, Any]] = None
+        self._ward_rankings_cache: Optional[List[Dict[str, Any]]] = None
+
         self.load_initial_data()
+
+    def _index_record(self, cid: str, rec: Dict[str, Any]):
+        """Adds a complaint ID to secondary inverted indexes."""
+        if rec.get("category"):
+            self._category_idx[rec["category"]].add(cid)
+        if rec.get("priority"):
+            self._priority_idx[rec["priority"]].add(cid)
+        if rec.get("status"):
+            self._status_idx[rec["status"]].add(cid)
+        if rec.get("ward"):
+            self._ward_idx[rec["ward"]].add(cid)
+        if rec.get("reference_id"):
+            self._ref_id_idx[rec["reference_id"]] = cid
+        self._invalidate_analytics_cache()
+
+    def _unindex_record(self, cid: str, rec: Dict[str, Any]):
+        """Removes a complaint ID from secondary inverted indexes."""
+        if rec.get("category") and cid in self._category_idx[rec["category"]]:
+            self._category_idx[rec["category"]].discard(cid)
+        if rec.get("priority") and cid in self._priority_idx[rec["priority"]]:
+            self._priority_idx[rec["priority"]].discard(cid)
+        if rec.get("status") and cid in self._status_idx[rec["status"]]:
+            self._status_idx[rec["status"]].discard(cid)
+        if rec.get("ward") and cid in self._ward_idx[rec["ward"]]:
+            self._ward_idx[rec["ward"]].discard(cid)
+        if rec.get("reference_id") and rec["reference_id"] in self._ref_id_idx:
+            del self._ref_id_idx[rec["reference_id"]]
+        self._invalidate_analytics_cache()
+
+    def _invalidate_analytics_cache(self):
+        self._analytics_cache = None
+        self._ward_rankings_cache = None
 
     def load_initial_data(self):
         seed_csv = r"E:\prompt warz\dataset\processed\civicai_seed_complaints.csv"
         if os.path.exists(seed_csv):
             try:
-                df = pd.read_csv(seed_csv, nrows=500) # Load first 500 for fast local dev
+                df = pd.read_csv(seed_csv, nrows=500)  # Load first 500 for fast local dev
                 for _, row in df.iterrows():
                     cid = str(uuid.uuid4())
                     ref_id = str(row.get("reference_id", f"BLR-2024-{cid[:6].upper()}"))
@@ -45,23 +93,49 @@ class ComplaintService:
                         "resolved_at": datetime.utcnow().isoformat() if row.get("normalized_status") == "Resolved" else None
                     }
                     self.complaints_db[cid] = record
-                print(f"Loaded {len(self.complaints_db)} initial complaints into memory.")
+                    self._index_record(cid, record)
+                logger.info(f"Indexed {len(self.complaints_db)} initial complaints into memory.")
             except Exception as e:
-                print(f"Notice: Could not load seed CSV ({e}). Starting with empty store.")
+                logger.warning(f"Notice: Could not load seed CSV ({e}). Starting with empty store.")
 
     def get_all(self, category: Optional[str] = None, priority: Optional[str] = None, 
                 status: Optional[str] = None, ward: Optional[str] = None, 
                 search: Optional[str] = None, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
-        results = list(self.complaints_db.values())
-        
+        """
+        High-performance filtered complaint retrieval utilizing inverted index set intersections.
+        Reduces time complexity from O(N) to O(1) set candidate operations.
+        """
+        candidate_ids: Optional[Set[str]] = None
+
         if category and category != "All":
-            results = [c for c in results if c["category"] == category]
+            c_set = self._category_idx.get(category, set())
+            candidate_ids = c_set if candidate_ids is None else candidate_ids & c_set
+            if not candidate_ids:
+                return []
+
         if priority and priority != "All":
-            results = [c for c in results if c["priority"] == priority]
+            p_set = self._priority_idx.get(priority, set())
+            candidate_ids = p_set if candidate_ids is None else candidate_ids & p_set
+            if not candidate_ids:
+                return []
+
         if status and status != "All":
-            results = [c for c in results if c["status"] == status]
+            s_set = self._status_idx.get(status, set())
+            candidate_ids = s_set if candidate_ids is None else candidate_ids & s_set
+            if not candidate_ids:
+                return []
+
         if ward and ward != "All":
-            results = [c for c in results if c["ward"] == ward]
+            w_set = self._ward_idx.get(ward, set())
+            candidate_ids = w_set if candidate_ids is None else candidate_ids & w_set
+            if not candidate_ids:
+                return []
+
+        if candidate_ids is not None:
+            results = [self.complaints_db[cid] for cid in candidate_ids if cid in self.complaints_db]
+        else:
+            results = list(self.complaints_db.values())
+
         if search:
             q = search.lower()
             results = [c for c in results if q in c["title"].lower() or q in c["description"].lower() or q in c["reference_id"].lower()]
@@ -107,7 +181,7 @@ class ComplaintService:
             )
             urllib.request.urlopen(req, timeout=3)
         except Exception as e:
-            print(f"Supabase sync notice: {e}")
+            logger.debug(f"Supabase sync notice: {e}")
 
     def _sync_patch_to_supabase(self, complaint_id: str, patch_data: Dict[str, Any], ref_id: Optional[str] = None):
         if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
@@ -128,12 +202,14 @@ class ComplaintService:
             )
             urllib.request.urlopen(req, timeout=3)
         except Exception as e:
-            print(f"Supabase patch notice: {e}")
+            logger.debug(f"Supabase patch notice: {e}")
 
     def get_by_reference_id(self, ref_id: str) -> Optional[Dict[str, Any]]:
-        for c in self.complaints_db.values():
-            if c["reference_id"] == ref_id:
-                return c
+        """O(1) index lookup by reference ID, falling back to Supabase if not in memory."""
+        cid = self._ref_id_idx.get(ref_id)
+        if cid and cid in self.complaints_db:
+            return self.complaints_db[cid]
+            
         # Fallback to direct Supabase PostgreSQL query
         if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
             try:
@@ -150,9 +226,10 @@ class ComplaintService:
                     if data and len(data) > 0:
                         rec = data[0]
                         self.complaints_db[rec["id"]] = rec
+                        self._index_record(rec["id"], rec)
                         return rec
             except Exception as e:
-                print(f"Supabase fetch by ref notice: {e}")
+                logger.debug(f"Supabase fetch by ref notice: {e}")
         return None
 
     def create(self, data: Dict[str, Any], citizen_id: str = "citizen-demo-01") -> Dict[str, Any]:
@@ -173,7 +250,7 @@ class ComplaintService:
             "ward": data.get("ward", "Bengaluru Central"),
             "latitude": data.get("latitude", 12.9716),
             "longitude": data.get("longitude", 77.5946),
-            "priority": "Medium", # Default before AI review
+            "priority": "Medium",  # Default before AI review
             "status": "Submitted",
             "assigned_department_id": None,
             "assigned_officer_id": None,
@@ -184,6 +261,7 @@ class ComplaintService:
             "resolved_at": None
         }
         self.complaints_db[cid] = record
+        self._index_record(cid, record)
         
         # Initial status history
         self.status_history_db[cid] = [{
@@ -201,12 +279,19 @@ class ComplaintService:
         if complaint_id not in self.complaints_db:
             return None
         c = self.complaints_db[complaint_id]
+        old_status = c.get("status")
         c["status"] = new_status
         now_str = datetime.utcnow().isoformat()
         c["updated_at"] = now_str
         if new_status == "Resolved":
             c["resolved_at"] = now_str
             
+        # Update status index
+        if old_status and complaint_id in self._status_idx[old_status]:
+            self._status_idx[old_status].discard(complaint_id)
+        self._status_idx[new_status].add(complaint_id)
+        self._invalidate_analytics_cache()
+
         if complaint_id not in self.status_history_db:
             self.status_history_db[complaint_id] = []
             
@@ -223,5 +308,43 @@ class ComplaintService:
 
     def get_status_history(self, complaint_id: str) -> List[Dict[str, Any]]:
         return self.status_history_db.get(complaint_id, [])
+
+    def get_analytics_metrics(self) -> Dict[str, Any]:
+        """Cached KPI aggregation with O(1) retrieval."""
+        if self._analytics_cache is not None:
+            return self._analytics_cache
+
+        all_complaints = list(self.complaints_db.values())
+        total = len(all_complaints)
+        
+        status_counts = Counter(c["status"] for c in all_complaints)
+        priority_counts = Counter(c["priority"] for c in all_complaints)
+        category_counts = Counter(c["category"] for c in all_complaints)
+
+        self._analytics_cache = {
+            "total_complaints": total,
+            "awaiting_review": status_counts.get("Awaiting Review", 0) + status_counts.get("Submitted", 0),
+            "in_progress": status_counts.get("In Progress", 0) + status_counts.get("Assigned", 0),
+            "resolved": status_counts.get("Resolved", 0),
+            "rejected": status_counts.get("Rejected", 0),
+            "high_or_critical": priority_counts.get("Critical", 0) + priority_counts.get("High", 0),
+            "category_distribution": [
+                {"category": k, "count": v} for k, v in category_counts.most_common(8)
+            ],
+            "priority_distribution": [
+                {"priority": k, "count": v} for k, v in priority_counts.items()
+            ]
+        }
+        return self._analytics_cache
+
+    def get_ward_rankings_metrics(self) -> List[Dict[str, Any]]:
+        """Cached ward ranking metrics."""
+        if self._ward_rankings_cache is not None:
+            return self._ward_rankings_cache
+
+        all_complaints = list(self.complaints_db.values())
+        ward_counts = Counter(c.get("ward", "Unknown") for c in all_complaints if c.get("ward"))
+        self._ward_rankings_cache = [{"ward": w, "count": cnt} for w, cnt in ward_counts.most_common(15)]
+        return self._ward_rankings_cache
 
 complaint_service = ComplaintService()

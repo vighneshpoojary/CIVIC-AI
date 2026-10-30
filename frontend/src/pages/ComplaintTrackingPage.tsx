@@ -77,11 +77,17 @@ export const ComplaintTrackingPage: React.FC = () => {
             e.preventDefault();
             fetchTracking(refId);
           }}
+          aria-label="Complaint Tracking Form"
           className="mt-6 flex items-center bg-white p-1.5 rounded-xl border border-slate-300 shadow-sm focus-within:border-[#087F8C]"
         >
-          <Search className="w-5 h-5 text-slate-400 ml-2.5" />
+          <label htmlFor="tracking-ref-input" className="sr-only">
+            Complaint Reference ID
+          </label>
+          <Search className="w-5 h-5 text-slate-400 ml-2.5 shrink-0" aria-hidden="true" />
           <input
+            id="tracking-ref-input"
             type="text"
+            aria-label="Complaint Reference ID"
             placeholder="e.g. BLR-2024-00001"
             value={refId}
             onChange={(e) => setRefId(e.target.value)}
@@ -89,7 +95,8 @@ export const ComplaintTrackingPage: React.FC = () => {
           />
           <button
             type="submit"
-            className="px-5 py-2 bg-[#087F8C] hover:bg-[#06636D] text-white text-xs font-semibold rounded-lg transition-colors"
+            aria-label="Track complaint status"
+            className="px-5 py-2 bg-[#087F8C] hover:bg-[#06636D] text-white text-xs font-semibold rounded-lg transition-colors focus:ring-2 focus:ring-[#087F8C]"
           >
             {loading ? 'Searching...' : 'Track'}
           </button>

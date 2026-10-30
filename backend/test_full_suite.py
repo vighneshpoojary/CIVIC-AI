@@ -280,7 +280,7 @@ def test_jwt_expired_token_rejection(secret):
 
 def test_jwt_tampered_token_rejection(secret):
     payload = {"sub": "hacker", "role": "admin"}
-    token = jwt.encode(payload, "wrong_secret_12345", algorithm="HS256")
+    token = jwt.encode(payload, "wrong_secret_tampered_key_32_bytes_long!!", algorithm="HS256")
     from app.core.security import decode_token
     from fastapi import HTTPException
     try:
@@ -327,6 +327,47 @@ def test_not_found_handling():
     except urllib.error.HTTPError as e:
         assert e.code == 404
         return "Proper 404 returned for missing resources"
+
+def test_security_headers_and_rate_limiting():
+    req = urllib.request.Request(f"{API_URL}/complaints?limit=1")
+    with urllib.request.urlopen(req) as resp:
+        x_content = resp.headers.get("X-Content-Type-Options")
+        x_frame = resp.headers.get("X-Frame-Options")
+        hsts = resp.headers.get("Strict-Transport-Security")
+        limit = resp.headers.get("X-RateLimit-Limit")
+        remaining = resp.headers.get("X-RateLimit-Remaining")
+        process_time = resp.headers.get("X-Process-Time")
+        assert x_content == "nosniff", f"Expected nosniff, got {x_content}"
+        assert x_frame == "DENY", f"Expected DENY, got {x_frame}"
+        assert hsts is not None, "Missing HSTS header"
+        assert limit is not None, "Missing X-RateLimit-Limit"
+        assert remaining is not None, "Missing X-RateLimit-Remaining"
+        assert process_time is not None, "Missing X-Process-Time"
+        return f"Headers verified: X-Frame-Options={x_frame}, RateLimit={remaining}/{limit}, ProcessTime={process_time}"
+
+def test_xss_input_sanitization():
+    xss_payload = {
+        "title": "<script>alert('xss')</script> Broken Streetlamp",
+        "description": "<img src=x onerror=alert('xss')> Exposed wire sparking",
+        "category": "Street Lighting",
+        "address": "<b onmouseover=alert('xss')>MG Road Metro</b>",
+        "ward": "Ward 111",
+        "latitude": 12.9750,
+        "longitude": 77.6050
+    }
+    req = urllib.request.Request(
+        f"{API_URL}/complaints",
+        data=json.dumps(xss_payload).encode('utf-8'),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+    with urllib.request.urlopen(req) as resp:
+        data = json.loads(resp.read().decode())
+        assert "<script>" not in data["title"]
+        assert "&lt;script&gt;" in data["title"]
+        assert "<img" not in data["description"]
+        assert "&lt;img" in data["description"]
+        return f"XSS payload sanitized: {data['title'][:30]}..."
 
 # Run Master Suite
 if __name__ == "__main__":
@@ -398,6 +439,10 @@ if __name__ == "__main__":
     t, _ = run_test("PII data masking on public endpoints", test_pii_protection)
     passed += t; total += 1
     t, _ = run_test("404 error envelope for missing items", test_not_found_handling)
+    passed += t; total += 1
+    t, _ = run_test("OWASP security headers & rate limiting", test_security_headers_and_rate_limiting)
+    passed += t; total += 1
+    t, _ = run_test("XSS payload input sanitization", test_xss_input_sanitization)
     passed += t; total += 1
 
     print_header("Master Test Suite Execution Result")

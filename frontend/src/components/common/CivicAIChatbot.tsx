@@ -80,7 +80,9 @@ export const CivicAIChatbot: React.FC = () => {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 p-3.5 bg-[#087F8C] hover:bg-[#06636D] text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
+        aria-label={isOpen ? "Close CivicAI Assistant" : "Open CivicAI Assistant"}
+        aria-expanded={isOpen}
+        className="fixed bottom-6 right-6 z-50 p-3.5 bg-[#087F8C] hover:bg-[#06636D] text-white rounded-full shadow-lg flex items-center justify-center transition-colors focus:ring-2 focus:ring-offset-2 focus:ring-[#087F8C]"
       >
         {isOpen ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
       </motion.button>
@@ -89,6 +91,9 @@ export const CivicAIChatbot: React.FC = () => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
+            role="dialog"
+            aria-label="CivicAI Assistant Dialog"
+            aria-modal="true"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -108,7 +113,8 @@ export const CivicAIChatbot: React.FC = () => {
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-slate-300 hover:text-white"
+                aria-label="Close Chat Window"
+                className="text-slate-300 hover:text-white p-1 rounded focus:ring-1 focus:ring-white"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -186,19 +192,23 @@ export const CivicAIChatbot: React.FC = () => {
                 e.preventDefault();
                 handleSend();
               }}
+              aria-label="CivicAI Assistant Chat Input Form"
               className="p-3 bg-white border-t border-slate-200 flex items-center space-x-2"
             >
               <input
+                id="civicai-chat-prompt"
                 type="text"
+                aria-label="Type your civic question or grievance"
                 placeholder="Ask a question or describe an issue..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:border-[#087F8C]"
+                className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:border-[#087F8C] focus:ring-1 focus:ring-[#087F8C]"
               />
               <button
                 type="submit"
+                aria-label="Send message to CivicAI Assistant"
                 disabled={!input.trim()}
-                className="p-2 bg-[#087F8C] hover:bg-[#06636D] text-white rounded-lg disabled:opacity-50 transition-colors"
+                className="p-2 bg-[#087F8C] hover:bg-[#06636D] text-white rounded-lg disabled:opacity-50 transition-colors focus:ring-2 focus:ring-[#087F8C]"
               >
                 <Send className="w-3.5 h-3.5" />
               </button>

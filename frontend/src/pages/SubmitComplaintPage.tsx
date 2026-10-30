@@ -185,11 +185,14 @@ export const SubmitComplaintPage: React.FC = () => {
               <h3 className="text-base font-bold text-[#102E50]">Step 1: What is the issue?</h3>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="complaint-title" className="block text-xs font-semibold text-slate-700 mb-1">
                   Complaint Title *
                 </label>
                 <input
+                  id="complaint-title"
                   type="text"
+                  required
+                  aria-required="true"
                   placeholder="e.g. Hazardous deep pothole on 24th Main Road"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -198,11 +201,14 @@ export const SubmitComplaintPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="complaint-description" className="block text-xs font-semibold text-slate-700 mb-1">
                   Detailed Description *
                 </label>
                 <textarea
+                  id="complaint-description"
                   rows={4}
+                  required
+                  aria-required="true"
                   placeholder="Provide context (e.g. Near school entrance, waterlogged during rain, two-wheelers slipping...)"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -214,6 +220,7 @@ export const SubmitComplaintPage: React.FC = () => {
                     type="button"
                     onClick={handleRunAIAssist}
                     disabled={aiAnalyzing || !formData.title || !formData.description}
+                    aria-label="Run Gemini AI Auto-suggest for category and priority"
                     className="inline-flex items-center text-xs font-semibold text-[#087F8C] hover:underline disabled:opacity-50"
                   >
                     <Sparkles className="w-3.5 h-3.5 mr-1" />
@@ -231,8 +238,9 @@ export const SubmitComplaintPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Category</label>
+                  <label htmlFor="complaint-category" className="block text-xs font-semibold text-slate-700 mb-1">Category</label>
                   <select
+                    id="complaint-category"
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-[#087F8C] outline-none bg-white"
@@ -243,8 +251,9 @@ export const SubmitComplaintPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Ward / Zone</label>
+                  <label htmlFor="complaint-ward" className="block text-xs font-semibold text-slate-700 mb-1">Ward / Zone</label>
                   <input
+                    id="complaint-ward"
                     type="text"
                     value={formData.ward}
                     onChange={(e) => setFormData({ ...formData, ward: e.target.value })}
@@ -258,6 +267,7 @@ export const SubmitComplaintPage: React.FC = () => {
                   type="button"
                   disabled={!formData.title || !formData.description}
                   onClick={() => setStep(2)}
+                  aria-label="Proceed to location step"
                   className="inline-flex items-center px-5 py-2.5 bg-[#087F8C] hover:bg-[#06636D] text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors"
                 >
                   Next: Location &rarr;
@@ -277,11 +287,14 @@ export const SubmitComplaintPage: React.FC = () => {
               <h3 className="text-base font-bold text-[#102E50]">Step 2: Where is it located?</h3>
               
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="complaint-address" className="block text-xs font-semibold text-slate-700 mb-1">
                   Street Address / Landmark *
                 </label>
                 <input
+                  id="complaint-address"
                   type="text"
+                  required
+                  aria-required="true"
                   placeholder="e.g. Opposite St. Mary's School, 24th Main, HSR Layout Sector 2"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -297,6 +310,7 @@ export const SubmitComplaintPage: React.FC = () => {
                   </span>
                   <button
                     type="button"
+                    aria-label="Use browser GPS location"
                     onClick={() => {
                       if (navigator.geolocation) {
                         navigator.geolocation.getCurrentPosition(
@@ -312,20 +326,24 @@ export const SubmitComplaintPage: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <span className="text-[10px] text-slate-400 block">Latitude</span>
+                    <label htmlFor="complaint-lat" className="text-[10px] text-slate-500 font-medium block">Latitude</label>
                     <input
+                      id="complaint-lat"
                       type="number"
                       step="0.0001"
+                      aria-label="Latitude coordinate"
                       value={formData.latitude}
                       onChange={(e) => setFormData({ ...formData, latitude: parseFloat(e.target.value) || 0 })}
                       className="w-full px-2.5 py-1.5 text-xs rounded border border-slate-300 bg-white"
                     />
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block">Longitude</span>
+                    <label htmlFor="complaint-lon" className="text-[10px] text-slate-500 font-medium block">Longitude</label>
                     <input
+                      id="complaint-lon"
                       type="number"
                       step="0.0001"
+                      aria-label="Longitude coordinate"
                       value={formData.longitude}
                       onChange={(e) => setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })}
                       className="w-full px-2.5 py-1.5 text-xs rounded border border-slate-300 bg-white"
