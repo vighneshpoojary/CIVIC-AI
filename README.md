@@ -1,5 +1,19 @@
 # CivicAI – Smarter Cities. Stronger Communities.
 
+
+
+## Project Screenshots
+
+### Home Page
+![CivicAI Home Page](https://github.com/vighneshpoojary/CIVIC-AI/blob/main/assets/%20(1).png)
+
+### Citizen Dashboard
+![Citizen Dashboard](https://github.com/vighneshpoojary/CIVIC-AI/blob/main/assets/%20(2).png)
+
+### Admin Dashboard
+![Admin Dashboard](https://github.com/vighneshpoojary/CIVIC-AI/blob/main/assets/%20(3).png)
+
+
 > **From Complaints to Action – PromptWars x ASTRA | AI for Civic Impact Hackathon**
 
 CivicAI is an AI-powered civic complaint management and municipal action platform for **Bengaluru, Karnataka, India**. It transforms scattered citizen reports into prioritized, explainable, and trackable municipal actions across 198 BBMP wards.
